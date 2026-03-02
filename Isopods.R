@@ -7,7 +7,8 @@ library(emmeans)
 
 library(readxl)
 feeding <- read_excel("Strip Assessments.xlsx")
-View(feeding)
+weights <- read_excel("Weight.xlsx")
+mortality <- read_excel("Mortality.xlsx")
 
 feeding <- feeding %>%
   mutate(
@@ -30,13 +31,28 @@ feeding <- feeding %>%
     Species = relevel(Species, ref = "O. asellus")  # set reference if desired
   )
 
+# Merge with weights and mortality:
+feeding = feeding %>%
+  full_join(
+    weights %>%
+      rename(biomass_g = `Total Biomass (g)`) %>%
+      select(Species, `Arena #`, `Trial #`, biomass_g) %>%
+      full_join(
+        mortality %>%
+          select(Species, `Arena #`, `Trial #`, Mortality),
+        by = join_by(Species, `Arena #`, `Trial #`)
+      ),
+    by = join_by(Species, `Arena #`, `Trial #`)
+  )
+
 
 m_area_all <- glmmTMB(
-  Area ~ Species*Env + Env * Diet + (1 | Arena),
-  dispformula = ~Env + Species,
+  Area ~ Species*Env + Diet + (1|Arena) + (1|Trial),
+  dispformula = ~Species + Env,
   data = feeding
 )
 
+AIC(m_area_all)
 summary(m_area_all)
 plot(simulateResiduals(m_area_all))
 testCategorical(simulateResiduals(m_area_all), catPred = feeding$Env)
@@ -44,6 +60,63 @@ testCategorical(simulateResiduals(m_area_all), catPred = feeding$Species)
 testCategorical(simulateResiduals(m_area_all), catPred = feeding$Diet)
 testCategorical(simulateResiduals(m_area_all), catPred = feeding$Trial)
 testCategorical(simulateResiduals(m_area_all), catPred = feeding$Arena)
+testQuantiles(simulateResiduals(m_area_all), predictor = feeding$biomass_g)
+testQuantiles(simulateResiduals(m_area_all), predictor = feeding$Mortality)
+
+
+feeding %>%
+  ggplot(aes(x = Env, y = Area, fill = Diet)) + geom_boxplot() + facet_wrap(.~Species)
+
+
+feedingAV = feeding %>% filter(Species == "A. vulgare")
+m_area_AV <- glmmTMB(
+  Area ~ Env*Diet + Mortality + (1 | Arena) + (1|Trial),
+  data = feedingAV
+)
+
+AIC(m_area_AV)
+summary(m_area_AV)
+plot(simulateResiduals(m_area_AV))
+testCategorical(simulateResiduals(m_area_AV), catPred = feedingAV$Env)
+testCategorical(simulateResiduals(m_area_AV), catPred = feedingAV$Diet)
+testCategorical(simulateResiduals(m_area_AV), catPred = feedingAV$Trial)
+testCategorical(simulateResiduals(m_area_AV), catPred = feedingAV$Arena)
+testQuantiles(simulateResiduals(m_area_AV), predictor = feedingAV$biomass_g)
+testQuantiles(simulateResiduals(m_area_AV), predictor = feedingAV$Mortality)
+
+
+feedingOA = feeding %>% filter(Species == "O. asellus")
+m_area_OA <- glmmTMB(
+  Area ~ Env*Diet + (1 | Arena) + (1|Trial),
+  dispformula = ~Env,
+  data = feedingOA
+)
+
+AIC(m_area_OA)
+summary(m_area_OA)
+plot(simulateResiduals(m_area_OA))
+testCategorical(simulateResiduals(m_area_OA), catPred = feedingOA$Env)
+testCategorical(simulateResiduals(m_area_OA), catPred = feedingOA$Diet)
+testCategorical(simulateResiduals(m_area_OA), catPred = feedingOA$Trial)
+testCategorical(simulateResiduals(m_area_OA), catPred = feedingOA$Arena)
+testQuantiles(simulateResiduals(m_area_OA), predictor = feedingOA$biomass_g)
+testQuantiles(simulateResiduals(m_area_OA), predictor = feedingOA$Mortality)
+
+
+
+
+feeding %>%
+  group_by(Arena, Species, Trial, Env, Diet) %>%
+  summarize(Area = sum(Area)) %>% View()
+
+
+
+
+
+
+
+
+
 
 
 
