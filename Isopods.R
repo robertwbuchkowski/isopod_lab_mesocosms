@@ -45,10 +45,16 @@ feeding = feeding %>%
     by = join_by(Species, `Arena #`, `Trial #`)
   )
 
+feeding = feeding %>%
+  mutate(Arena2 = as.numeric(Arena)) %>%
+  mutate(Arena2 = ifelse(Species == "A. vulgare", Arena2 + 4, Arena2)) %>%
+  mutate(Arena = as.factor(Arena2)) %>%
+  select(-Arena2)
 
 m_area_all <- glmmTMB(
-  Area ~ Species*Env + Diet + (1|Arena) + (1|Trial),
-  dispformula = ~Species + Env,
+  Area ~ Species*Env*Diet + (1|Arena) + (1|Trial),
+  dispformula = ~Species,
+  family = tweedie(),
   data = feeding
 )
 
@@ -66,6 +72,12 @@ testQuantiles(simulateResiduals(m_area_all), predictor = feeding$Mortality)
 
 feeding %>%
   ggplot(aes(x = Env, y = Area, fill = Diet)) + geom_boxplot() + facet_wrap(.~Species)
+
+feeding %>%
+  ggplot(aes(x = Trial, y = Area, fill = Diet)) + geom_boxplot()
+
+feeding %>%
+  ggplot(aes(x = Arena, y = Area, fill = Diet)) + geom_boxplot()
 
 
 feedingAV = feeding %>% filter(Species == "A. vulgare")
