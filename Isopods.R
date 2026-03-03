@@ -45,6 +45,7 @@ feeding = feeding %>%
     by = join_by(Species, `Arena #`, `Trial #`)
   )
 
+# Make the new arenas unique, because they were made fresh:
 feeding = feeding %>%
   mutate(Arena2 = as.numeric(Arena)) %>%
   mutate(Arena2 = ifelse(Species == "A. vulgare", Arena2 + 4, Arena2)) %>%
@@ -58,6 +59,8 @@ m_area_all <- glmmTMB(
   data = feeding
 )
 
+# While not including in the model that validates well, mortality does appear important, especially for AV...see models below.
+
 AIC(m_area_all)
 summary(m_area_all)
 plot(simulateResiduals(m_area_all))
@@ -70,8 +73,28 @@ testQuantiles(simulateResiduals(m_area_all), predictor = feeding$biomass_g)
 testQuantiles(simulateResiduals(m_area_all), predictor = feeding$Mortality)
 
 
+# Overall:
 feeding %>%
   ggplot(aes(x = Env, y = Area, fill = Diet)) + geom_boxplot() + facet_wrap(.~Species)
+
+# Examine proportion fed in each environment:
+feeding %>%
+  select(Arena, Trial, Env, Area, Diet, Species) %>%
+  group_by(Arena, Trial, Env, Species) %>%
+  summarize(Area = sum(Area)) %>%
+  pivot_wider(names_from = Env, values_from = Area) %>%
+  mutate(PropDry = D/(D+M)) %>%
+  ggplot(aes(x = Species, y = PropDry)) + geom_boxplot()
+
+# Examine proportion fed on each diet, when both are present:
+feeding %>%
+  filter(Arena %in% c(1,2,5,6)) %>%
+  select(Arena, Trial, Env, Area, Diet, Species) %>%
+  group_by(Trial, Diet, Species) %>%
+  summarize(Area = sum(Area)) %>%
+  pivot_wider(names_from = Diet, values_from = Area) %>%
+  mutate(PropHN = HN/(HN+LN)) %>%
+  ggplot(aes(x = Species, y = PropHN)) + geom_boxplot()
 
 feeding %>%
   ggplot(aes(x = Trial, y = Area, fill = Diet)) + geom_boxplot()
@@ -79,6 +102,9 @@ feeding %>%
 feeding %>%
   ggplot(aes(x = Arena, y = Area, fill = Diet)) + geom_boxplot()
 
+
+
+############################################------#
 
 feedingAV = feeding %>% filter(Species == "A. vulgare")
 m_area_AV <- glmmTMB(
